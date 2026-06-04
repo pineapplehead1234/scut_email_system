@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>站内邮件系统 - MVP</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+
+        .mail-unread {
+            font-weight: bold;
+            background-color: #f0f9ff;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app" v-cloak>
+        <!-- 1. 登录/注册页 -->
+        <div v-if="!isLoggedIn" class="min-h-screen flex items-center justify-center p-4">
+            <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+                <div class="flex justify-around mb-8 border-b">
+                    <button @click="authMode = 'login'"
+                        :class="{'text-blue-600 border-b-2 border-blue-600 pb-2': authMode === 'login'}">登录</button>
+                    <button @click="authMode = 'register'"
+                        :class="{'text-blue-600 border-b-2 border-blue-600 pb-2': authMode === 'register'}">注册</button>
+                </div>
+
+                <!-- 登录表单 -->
+                <form v-if="authMode === 'login'" @submit.prevent="handleLogin">
+                    <div class="mb-4">
+                        <label class="block mb-1 text-sm">用户名</label>
+                        <input v-model="authForm.username" type="text"
+                            class="w-full border rounded px-3 py-2 outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block mb-1 text-sm">密码</label>
+                        <input v-model="authForm.password" type="password"
+                            class="w-full border rounded px-3 py-2 outline-none focus:border-blue-500" required>
+                    </div>
+                    <button type="submit"
+                        class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">立即登录</button>
+                </form>
+
+                <!-- 注册表单 -->
+                <form v-else @submit.prevent="handleRegister">
+                    <div class="mb-4">
+                        <label class="block mb-1 text-sm">用户名 (系统唯一)</label>
+                        <input v-model="authForm.username" type="text" class="w-full border rounded px-3 py-2" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block mb-1 text-sm">密码</label>
+                        <input v-model="authForm.password" type="password" class="w-full border rounded px-3 py-2"
+                            required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block mb-1 text-sm">昵称</label>
+                        <input v-model="authForm.nickname" type="text" class="w-full border rounded px-3 py-2"
+                            placeholder="默认同用户名">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block mb-1 text-sm">备用邮箱</label>
+                        <input v-model="authForm.email" type="email" class="w-full border rounded px-3 py-2">
+                    </div>
+                    <button type="submit"
+                        class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition">创建账号</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 2. 主布局 -->
+        <div v-else class="flex h-screen overflow-hidden">
+            <!-- 左侧导航 -->
+            <div class="w-64 bg-slate-800 text-white flex flex-col">
+                <div class="p-6 text-xl font-bold border-b border-slate-700">Mail System</div>
+                <nav class="flex-1 p-4 space-y-2">
+                    <button @click="navigate('compose')"
+                        :class="['w-full text-left px-4 py-2 rounded', currentView === 'compose' ? 'bg-blue-600' : 'hover:bg-slate-700']">
+                        ✎ 写邮件
+                    </button>
+                    <div class="pt-4 pb-2 text-xs text-slate-500 uppercase">文件夹</div>
+                    <button @click="navigate('inbox')"
+                        :class="['w-full text-left px-4 py-2 rounded flex justify-between', currentView === 'inbox' ? 'bg-slate-700' : 'hover:bg-slate-700']">
+                        <span>📥 收件箱</span>
+                    </button>
+                    <button @click="navigate('sent')"
+                        :class="['w-full text-left px-4 py-2 rounded', currentView === 'sent' ? 'bg-slate-700' : 'hover:bg-slate-700']">
+                        <span>📤 已发送</span>
+                    </button>
+                </nav>
+                <div class="p-4 border-t border-slate-700">
+                    <div class="text-sm text-slate-400 mb-2">当前用户: {{ user.nickname || user.username }}</div>
+                    <button @click="handleLogout" class="text-xs text-red-400 hover:underline">退出登录</button>
+                </div>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="flex-1 flex flex-col bg-white overflow-hidden">
+                <!-- 头部 -->
+                <header class="h-14 border-b flex items-center px-6 justify-between bg-white shrink-0">
+                    <h2 class="font-semibold text-lg">{{ viewTitle }}</h2>
+                    <div class="text-gray-400 text-sm italic">Mail System MVP v1.0</div>
+                </header>
+
+                <!-- 内容滚动区 -->
+                <main class="flex-1 overflow-y-auto p-6">
+
+                    <!-- 收件箱/已发送列表 -->
+                    <div v-if="currentView === 'inbox' || currentView === 'sent'">
+                        <div v-if="loading" class="text-center py-10 text-gray-500">加载中...</div>
+                        <div v-else-if="mailList.items.length === 0" class="text-center py-10 text-gray-400">
+                            暂无邮件
+                        </div>
+                        <table v-else class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-sm text-gray-500 border-b">
+                                    <th class="pb-2 font-medium">{{ currentView === 'inbox' ? '发件人' : '收件人' }}</th>
+                                    <th class="pb-2 font-medium">主题</th>
+                                    <th class="pb-2 font-medium w-40 text-right">时间</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="mail in mailList.items" :key="mail.id" @click="viewDetail(mail.id)" :class="['border-b cursor-pointer hover:bg-gray-50', 
+                                         (currentView === 'inbox' && mail.readStatus === 0) ? 'mail-unread' : '']">
+                                    <td class="py-3 pr-4">
+                                        {{ currentView === 'inbox' ? (mail.sender.nickname || mail.sender.username) :
+                                        (mail.recipient.nickname || mail.recipient.username) }}
+                                    </td>
+                                    <td class="py-3 pr-4 truncate max-w-md">{{ mail.subject }}</td>
+                                    <td class="py-3 text-right text-sm text-gray-500">{{ mail.sendTime }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <!-- 分页控制 -->
+                        <div class="mt-6 flex items-center justify-between text-sm" v-if="mailList.total > 0">
+                            <span class="text-gray-500">共 {{ mailList.total }} 封</span>
+                            <div class="flex gap-2">
+                                <button @click="changePage(-1)"
+                                    class="px-3 py-1 border rounded disabled:opacity-30">上一页</button>
+                                <span class="px-3 py-1">第 {{ mailList.page }} 页</span>
+                                <button @click="changePage(1)"
+                                    class="px-3 py-1 border rounded disabled:opacity-30">下一页</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 写邮件 -->
+                    <div v-if="currentView === 'compose'" class="max-w-2xl">
+                        <div class="space-y-4">
+                            <div>
+                                <input v-model="composeForm.recipientUsername" type="text" placeholder="收件人用户名"
+                                    class="w-full border-b py-2 outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <input v-model="composeForm.subject" type="text" placeholder="邮件主题"
+                                    class="w-full border-b py-2 outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <textarea v-model="composeForm.content" rows="12" placeholder="邮件正文..."
+                                    class="w-full border p-3 rounded outline-none focus:border-blue-500 resize-none"></textarea>
+                            </div>
+                            <div class="flex gap-4">
+                                <button @click="handleSend" :disabled="sending"
+                                    class="bg-blue-600 text-white px-8 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400">
+                                    {{ sending ? '发送中...' : '发送邮件' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 邮件详情 -->
+                    <div v-if="currentView === 'detail' && currentMail" class="max-w-4xl">
+                        <div class="mb-6 flex justify-between items-start">
+                            <div>
+                                <h1 class="text-2xl font-bold mb-4">{{ currentMail.subject }}</h1>
+                                <div class="flex items-center text-sm space-x-4">
+                                    <span class="text-gray-500">发件人: <b class="text-gray-700">{{
+                                            currentMail.sender.nickname }} ({{ currentMail.sender.username
+                                            }})</b></span>
+                                    <span class="text-gray-500">收件人: <b class="text-gray-700">{{
+                                            currentMail.recipient.username }}</b></span>
+                                </div>
+                                <div class="text-xs text-gray-400 mt-1">时间: {{ currentMail.sendTime }}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <!-- 收件人特有操作 -->
+                                <template v-if="currentMail.currentUserRole === 'recipient'">
+                                    <button v-if="currentMail.readStatus === 0" @click="handleMarkRead"
+                                        class="text-sm px-3 py-1 border border-blue-600 text-blue-600 rounded hover:bg-blue-50">标记已读</button>
+                                    <button @click="handleDelete"
+                                        class="text-sm px-3 py-1 border border-red-600 text-red-600 rounded hover:bg-red-50">逻辑删除</button>
+                                </template>
+                                <button @click="navigate(lastList)"
+                                    class="text-sm px-3 py-1 border rounded bg-gray-50">返回</button>
+                            </div>
+                        </div>
+                        <div class="border-t pt-6 whitespace-pre-wrap text-gray-700 leading-relaxed">
+                            {{ currentMail.content }}
+                        </div>
+                    </div>
+
+                </main>
+            </div>
+        </div>
+
+        <!-- 全局提示 (简单的 Alert 代替 Toast) -->
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                // --- 状态变量 ---
+                const isLoggedIn = ref(!!localStorage.getItem('mail_token'));
+                const authMode = ref('login');
+                const user = ref(JSON.parse(localStorage.getItem('mail_user') || '{}'));
+                const currentView = ref('inbox');
+                const lastList = ref('inbox'); // 记录是从哪个列表进的详情
+                const loading = ref(false);
+                const sending = ref(false);
+
+                // 表单数据
+                const authForm = reactive({ username: '', password: '', nickname: '', email: '' });
+                const composeForm = reactive({ recipientUsername: '', subject: '', content: '' });
+
+                // 列表数据
+                const mailList = reactive({ items: [], total: 0, page: 1, size: 10 });
+                const currentMail = ref(null);
+
+                // --- 视图逻辑 ---
+                const viewTitle = computed(() => {
+                    switch (currentView.ref) {
+                        case 'inbox': return '📥 收件箱';
+                        case 'sent': return '📤 已发送';
+                        case 'compose': return '✎ 写邮件';
+                        case 'detail': return '📧 邮件详情';
+                        default: return '邮件系统';
+                    }
+                });
+
+                const navigate = (view) => {
+                    currentView.value = view;
+                    if (view === 'inbox' || view === 'sent') {
+                        lastList.value = view;
+                        fetchMails(view);
+                    }
+                };
+
+                // --- 接口请求模拟 (对应第7章接口汇总) ---
+                // 真实联调时改写此对象内的 fetch 调用
+                const apiClient = {
+                    async post(url, data) {
+                        console.log(`POST ${url}`, data);
+                        // 模拟网络延迟
+                        await new Promise(r => setTimeout(r, 500));
+
+                        // 这里可以替换为真实的 fetch:
+                        // const res = await fetch(url, { 
+                        //    method: 'POST', 
+                        //    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mail_token')}` },
+                        //    body: JSON.stringify(data) 
+                        // });
+                        // return await res.json();
+
+                        // 下面是 Mock 演示逻辑
+                        if (url.includes('/login')) return { code: 200, data: { token: 'mock_token_123', user: { username: data.username, nickname: data.username + '的昵称' } } };
+                        if (url.includes('/register')) return { code: 200, message: '注册成功' };
+                        if (url.includes('/api/mails')) return { code: 200, message: '发送成功' };
+                        return { code: 200 };
+                    },
+                    async get(url) {
+                        console.log(`GET ${url}`);
+                        await new Promise(r => setTimeout(r, 300));
+
+                        // Mock 数据返回
+                        if (url.includes('/inbox')) return {
+                            code: 200,
+                            data: {
+                                page: 1, total: 2, items: [
+                                    { id: 101, subject: '欢迎加入站内邮件系统', sender: { username: 'system', nickname: '管理员' }, sendTime: '2023-10-01 10:00:00', readStatus: 0 },
+                                    { id: 102, subject: '关于实训项目的通知', sender: { username: 'alice', nickname: 'Alice' }, sendTime: '2023-10-02 14:30:00', readStatus: 1 }
+                                ]
+                            }
+                        };
+                        if (url.includes('/sent')) return {
+                            code: 200,
+                            data: {
+                                page: 1, total: 1, items: [
+                                    { id: 103, subject: '回复：关于实训项目', recipient: { username: 'alice', nickname: 'Alice' }, sendTime: '2023-10-03 09:15:00' }
+                                ]
+                            }
+                        };
+                        if (url.match(/\/mails\/\d+/)) return {
+                            code: 200,
+                            data: {
+                                id: 101, subject: '欢迎使用', content: '这是一封站内测试邮件的正文内容...\n换行测试。',
+                                sender: { username: 'system', nickname: '系统' }, recipient: { username: 'me' },
+                                sendTime: '2023-10-01 10:00:00', currentUserRole: 'recipient', readStatus: 0
+                            }
+                        };
+                        return { code: 200, data: {} };
+                    }
+                };
+
+                // --- 业务动作 ---
+                const handleLogin = async () => {
+                    const res = await apiClient.post('/api/auth/login', authForm);
+                    if (res.code === 200) {
+                        localStorage.setItem('mail_token', res.data.token);
+                        localStorage.setItem('mail_user', JSON.stringify(res.data.user));
+                        user.value = res.data.user;
+                        isLoggedIn.value = true;
+                        navigate('inbox');
+                    } else {
+                        alert('登录失败: ' + res.message);
+                    }
+                };
+
+                const handleRegister = async () => {
+                    const res = await apiClient.post('/api/auth/register', authForm);
+                    if (res.code === 200) {
+                        alert('注册成功，请登录');
+                        authMode.ref = 'login';
+                    } else {
+                        alert('注册失败: ' + res.message);
+                    }
+                };
+
+                const handleLogout = () => {
+                    localStorage.clear();
+                    isLoggedIn.value = false;
+                    window.location.reload();
+                };
+
+                const fetchMails = async (type) => {
+                    loading.value = true;
+                    const res = await apiClient.get(`/api/mails/${type}?page=${mailList.page}&size=${mailList.size}`);
+                    if (res.code === 200) {
+                        mailList.items = res.data.items;
+                        mailList.total = res.data.total;
+                    }
+                    loading.value = false;
+                };
+
+                const handleSend = async () => {
+                    if (!composeForm.recipientUsername || !composeForm.subject || !composeForm.content) {
+                        alert('请填写完整邮件内容');
+                        return;
+                    }
+                    sending.value = true;
+                    const res = await apiClient.post('/api/mails', composeForm);
+                    if (res.code === 200) {
+                        alert('发送成功');
+                        composeForm.recipientUsername = '';
+                        composeForm.subject = '';
+                        composeForm.content = '';
+                        navigate('sent');
+                    } else {
+                        alert('发送失败: ' + res.message);
+                    }
+                    sending.value = false;
+                };
+
+                const viewDetail = async (id) => {
+                    const res = await apiClient.get(`/api/mails/${id}`);
+                    if (res.code === 200) {
+                        currentMail.value = res.data;
+                        currentView.value = 'detail';
+                    } else if (res.code === 403) {
+                        alert('无权限查看该邮件');
+                    }
+                };
+
+                const handleMarkRead = async () => {
+                    const res = await apiClient.post(`/api/mails/${currentMail.value.id}/read`, {}); // 假设PATCH可用
+                    if (res.code === 200) {
+                        currentMail.value.readStatus = 1;
+                        alert('已标记为已读');
+                    }
+                };
+
+                const handleDelete = async () => {
+                    if (!confirm('确定要删除这封邮件吗？')) return;
+                    // 调用 DELETE 接口
+                    alert('逻辑删除成功');
+                    navigate('inbox');
+                };
+
+                const changePage = (delta) => {
+                    mailList.page += delta;
+                    fetchMails(lastList.value);
+                };
+
+                // 初始化
+                onMounted(() => {
+                    if (isLoggedIn.value) fetchMails('inbox');
+                });
+
+                return {
+                    isLoggedIn, authMode, authForm, user, currentView, viewTitle,
+                    mailList, loading, currentMail, lastList, composeForm, sending,
+                    handleLogin, handleRegister, handleLogout, navigate, viewDetail,
+                    handleSend, handleMarkRead, handleDelete, changePage
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>
