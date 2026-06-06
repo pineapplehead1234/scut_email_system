@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { createMemoryHistory } from 'vue-router'
 
-import { routes } from '../src/router'
+import { createAppRouter, routes } from '../src/router'
 
 describe('app routes', () => {
   it('defines the primary authenticated and public routes', () => {
@@ -28,5 +29,26 @@ describe('app routes', () => {
       '',
       'password',
     ])
+  })
+
+  it('redirects anonymous users from authenticated pages to login', async () => {
+    localStorage.clear()
+    const router = createAppRouter(createMemoryHistory())
+
+    await router.push('/mail/inbox')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.redirect).toBe('/mail/inbox')
+  })
+
+  it('redirects logged-in users away from login', async () => {
+    localStorage.setItem('mail_token', 'token-123')
+    const router = createAppRouter(createMemoryHistory())
+
+    await router.push('/login')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/mail/inbox')
   })
 })

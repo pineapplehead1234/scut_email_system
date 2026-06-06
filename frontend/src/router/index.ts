@@ -1,6 +1,12 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+  type Router,
+  type RouterHistory,
+} from 'vue-router'
 
+import { setUnauthorizedHandler } from '../api/http'
 import AppLayout from '../layouts/AppLayout.vue'
 import AuthPage from '../pages/auth/AuthPage.vue'
 import ComposePage from '../pages/mail/ComposePage.vue'
@@ -106,9 +112,57 @@ export const routes: RouteRecordRaw[] = [
   },
 ]
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-})
+function hasToken() {
+  return Boolean(localStorage.getItem('mail_token'))
+}
+
+function installAuthGuard(router: Router) {
+  router.beforeEach((to) => {
+    const loggedIn = hasToken()
+
+    if (!to.meta.public && !loggedIn) {
+      return {
+        path: '/login',
+        query: {
+          redirect: to.fullPath,
+        },
+      }
+    }
+
+    if (to.path === '/login' && loggedIn) {
+      return '/mail/inbox'
+    }
+
+    return true
+  })
+
+  setUnauthorizedHandler(() => {
+    const currentRoute = router.currentRoute.value
+
+    if (currentRoute.path === '/login') {
+      return
+    }
+
+    router.push({
+      path: '/login',
+      query: {
+        redirect: currentRoute.fullPath,
+      },
+    })
+  })
+}
+
+export function createAppRouter(history: RouterHistory = createWebHistory()) {
+  const router = createRouter({
+    history,
+    routes,
+  })
+
+  installAuthGuard(router)
+
+  return router
+}
+
+const router = createAppRouter()
 
 export default router

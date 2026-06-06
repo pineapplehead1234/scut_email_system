@@ -7,18 +7,18 @@ describe('network config', () => {
     expect(resolveNetworkConfig({})).toEqual({
       useMock: true,
       mockBaseURL: '/mock-api',
-      serverBaseURL: 'https://api.scut-mail.example.com/api',
+      serverBaseURL: 'https://api.scut-mail.example.com',
       apiBaseURL: '/mock-api',
     })
   })
 
-  it('uses server api when VITE_USE_MOCK is false', () => {
+  it('uses server origin when VITE_USE_MOCK is false', () => {
     expect(
       resolveNetworkConfig({
         VITE_USE_MOCK: 'false',
         VITE_SERVER_API_BASE_URL: 'https://server.example.test/api',
       }).apiBaseURL,
-    ).toBe('https://server.example.test/api')
+    ).toBe('https://server.example.test')
   })
 
   it('allows overriding the mock api base url', () => {
@@ -28,5 +28,14 @@ describe('network config', () => {
         VITE_MOCK_API_BASE_URL: 'http://127.0.0.1:3001/api',
       }).apiBaseURL,
     ).toBe('http://127.0.0.1:3001/api')
+  })
+
+  it('removes trailing slashes from configured base urls', () => {
+    expect(
+      resolveNetworkConfig({
+        VITE_USE_MOCK: 'false',
+        VITE_SERVER_API_BASE_URL: 'https://server.example.test///',
+      }).apiBaseURL,
+    ).toBe('https://server.example.test')
   })
 })
