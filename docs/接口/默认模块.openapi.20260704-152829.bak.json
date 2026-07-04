@@ -2247,7 +2247,7 @@
       "post": {
         "summary": "发送邮件 P0",
         "deprecated": false,
-        "description": "Bearer Token required. Single recipient only. No CC/BCC. `recipientUsername`, `subject` and `content` are required. content is RichTextNode[]. Sending creates a new mailId and threadId. AI failure must not block mail sending.",
+        "description": "Bearer Token required. Single recipient only. No CC/BCC. content is RichTextNode[]. Sending creates a new mailId and threadId. AI failure must not block mail sending.",
         "operationId": "sendEmail",
         "tags": [
           "邮件"
@@ -2262,7 +2262,7 @@
               "examples": {
                 "success": {
                   "value": {
-                    "recipientUsername": "zhangsan",
+                    "to": "zhangsan",
                     "subject": "subject",
                     "content": [
                       {
@@ -2404,7 +2404,7 @@
       "post": {
         "summary": "回复邮件 P0",
         "deprecated": false,
-        "description": "Each reply creates a new mailId in the specified threadId. `mailId` is the directly replied mail id, `threadId` is the thread primary key, and replyToMailId equals the replied mail id. analysis.replySuggestions are AI suggestions, not actual reply content; actual reply content is returned in GET /api/threads/{threadId} mails[].content.",
+        "description": "Each reply creates a new mailId, inherits the original threadId, and replyToMailId equals the replied mail id. analysis.replySuggestions are AI suggestions, not actual reply content; actual reply content is returned in GET /api/threads/{threadId} mails[].content.",
         "operationId": "replyEmail",
         "tags": [
           "邮件"
@@ -2421,7 +2421,7 @@
                   "value": {
                     "mailId": 1001,
                     "subject": "Re: subject",
-                    "threadId": 2001,
+                    "Sessionid": 2001,
                     "content": [
                       {
                         "type": "paragraph",
@@ -3444,7 +3444,7 @@
       "get": {
         "summary": "查询收件箱线程列表 P0/P1",
         "deprecated": false,
-        "description": "Inbox list is thread-level summary and does not return full mail body. `threadId` is the primary key for list item navigation and thread detail display; do not use `mailId` as the list primary key. Default sort is thread updatedAt descending. Frontend may poll GET /api/threads every 5 seconds. keyword searches subject, latest snippet, sender username and sender nickname.",
+        "description": "Inbox list is thread-level summary and does not return full mail body. Default sort is thread updatedAt descending. Frontend may poll GET /api/threads every 5 seconds. keyword searches subject, latest snippet, sender username and sender nickname.",
         "operationId": "listThreads",
         "tags": [
           "邮件线程"
@@ -4320,11 +4320,6 @@
       "SendEmailRequest": {
         "type": "object",
         "properties": {
-          "recipientUsername": {
-            "type": "string",
-            "description": "收件人用户名；当前版本只支持单收件人",
-            "example": "zhangsan"
-          },
           "subject": {
             "type": "string",
             "description": "邮件主题",
@@ -4351,7 +4346,6 @@
         },
         "additionalProperties": false,
         "required": [
-          "recipientUsername",
           "subject",
           "content"
         ]
@@ -5113,7 +5107,6 @@
           "mailId": {
             "type": "integer",
             "format": "int64",
-            "description": "被直接回复的邮件 ID；回复成功后新邮件的 replyToMailId 等于该值",
             "example": 1001
           },
           "content": {
@@ -5126,18 +5119,16 @@
             "type": "string",
             "example": "Re: subject"
           },
-          "threadId": {
+          "Sessionid": {
             "type": "integer",
             "format": "int64",
-            "description": "邮件线程 ID；前端从线程列表或线程详情中的 threadId 传入",
             "example": 2001
           }
         },
-        "additionalProperties": false,
         "required": [
           "mailId",
           "content",
-          "threadId"
+          "Sessionid"
         ]
       },
       "MailItemVO": {
@@ -5264,55 +5255,6 @@
           }
         }
       },
-      "ThreadLastMailVO": {
-        "type": "object",
-        "required": [
-          "mailId",
-          "threadId",
-          "replyToMailId",
-          "subject",
-          "sender",
-          "recipient",
-          "sentAt"
-        ],
-        "properties": {
-          "mailId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "线程中最后一封邮件的邮件 ID；只用于邮件级操作，不作为线程列表主键",
-            "example": 1002
-          },
-          "threadId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "所属线程 ID，应与外层 ThreadListItemVO.threadId 一致",
-            "example": 2001
-          },
-          "replyToMailId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true,
-            "description": "直接回复的上一封邮件 ID；首封邮件为 null",
-            "example": 1001
-          },
-          "subject": {
-            "type": "string",
-            "example": "Re: subject"
-          },
-          "sender": {
-            "$ref": "#/components/schemas/UserBrief"
-          },
-          "recipient": {
-            "$ref": "#/components/schemas/UserBrief"
-          },
-          "sentAt": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-05-25T16:20:00"
-          }
-        },
-        "additionalProperties": false
-      },
       "ThreadListItemVO": {
         "type": "object",
         "required": [
@@ -5347,7 +5289,8 @@
             "example": "snippet"
           },
           "lastMail": {
-            "$ref": "#/components/schemas/ThreadLastMailVO"
+            "type": "object",
+            "properties": {}
           },
           "unreadCount": {
             "type": "integer",
