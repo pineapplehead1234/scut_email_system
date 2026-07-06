@@ -26,14 +26,20 @@ describe('auth store', () => {
     mocks.getCurrentUser.mockReset()
   })
 
-  it('logs in and persists token with normalized current user', async () => {
+  it('logs in then fetches and persists the current user profile', async () => {
     mocks.login.mockResolvedValue({
       token: 'token-123',
       user: {
         username: 'admin',
-        nickname: '管理员',
-        emailAddress: 'admin@mail.com',
+        nickname: '登录返回昵称',
+        emailAddress: 'login@mail.com',
       },
+    })
+    mocks.getCurrentUser.mockResolvedValue({
+      username: 'admin',
+      nickname: '管理员',
+      emailAddress: 'admin@mail.com',
+      avatarText: '管',
     })
 
     const store = useAuthStore()
@@ -44,6 +50,7 @@ describe('auth store', () => {
     })
 
     expect(store.token).toBe('token-123')
+    expect(mocks.getCurrentUser).toHaveBeenCalledOnce()
     expect(store.user).toEqual({
       username: 'admin',
       nickname: '管理员',
@@ -52,6 +59,22 @@ describe('auth store', () => {
     })
     expect(localStorage.getItem('mail_token')).toBe('token-123')
     expect(JSON.parse(localStorage.getItem('mail_user') || '{}')).toEqual(store.user)
+  })
+
+  it('removes corrupted stored user data and keeps safe defaults', () => {
+    localStorage.setItem('mail_token', 'token-123')
+    localStorage.setItem('mail_user', '{bad-json')
+
+    const store = useAuthStore()
+
+    expect(store.token).toBe('token-123')
+    expect(store.user).toEqual({
+      username: '',
+      nickname: '',
+      emailAddress: '',
+      avatarText: '',
+    })
+    expect(localStorage.getItem('mail_user')).toBeNull()
   })
 
   it('clears local session even when remote logout fails', async () => {

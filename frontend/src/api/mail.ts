@@ -3,31 +3,25 @@ import type {
   DeleteMailData,
   MailDetailVO,
   MailFolder,
+  MailListQueryParams,
   MailPageData,
-  MailQueryParams,
   MailStatisticsVO,
   ReadMailData,
   ReadMailRequest,
   RestoreMailData,
   RetryAnalysisData,
-  SendMailData,
-  SendMailRequest,
 } from './type'
 
-const folderPathMap: Record<MailFolder, string> = {
-  inbox: '/api/mails/inbox',
-  sent: '/api/mails/sent',
-  trash: '/api/mails/trash',
-  spam: '/api/mails/spam',
+const folderEndpoints: Record<MailFolder, string> = {
+  INBOX: '/api/mails/inbox',
+  SENT: '/api/mails/sent',
+  TRASH: '/api/mails/trash',
+  SPAM: '/api/mails/spam',
 }
 
 const mailApi = {
-  send(data: SendMailRequest) {
-    return http.post<SendMailData, SendMailRequest>('/api/mails', data)
-  },
-
-  list(folder: MailFolder, params?: MailQueryParams) {
-    return http.get<MailPageData>(folderPathMap[folder], { params })
+  list(folder: MailFolder, params?: MailListQueryParams) {
+    return http.get<MailPageData>(folderEndpoints[folder], { params })
   },
 
   detail(mailId: number | string) {

@@ -20,8 +20,25 @@ describe('app routes', () => {
       'trash',
       'spam',
       'compose',
-      ':mailId',
+      'thread/:threadId',
     ])
+
+    expect(mailRoute?.children?.map((route) => route.name)).not.toContain(
+      'mail-detail',
+    )
+    expect(
+      mailRoute?.children
+        ?.filter((route) => String(route.name).startsWith('mail-'))
+        .map((route) => route.meta?.folder)
+        .filter(Boolean),
+    ).toEqual(['INBOX', 'SENT', 'TRASH', 'SPAM'])
+
+    const [inboxRoute, sentRoute, trashRoute, spamRoute] =
+      mailRoute?.children || []
+
+    expect(inboxRoute.component).not.toBe(sentRoute.component)
+    expect(sentRoute.component).toBe(trashRoute.component)
+    expect(trashRoute.component).toBe(spamRoute.component)
 
     const settingsRoute = routes.find((route) => route.path === '/settings')
 
@@ -50,5 +67,18 @@ describe('app routes', () => {
     await router.isReady()
 
     expect(router.currentRoute.value.path).toBe('/mail/inbox')
+  })
+
+  it('does not register a standalone mailId detail route', async () => {
+    localStorage.setItem('mail_token', 'token-123')
+    const router = createAppRouter(createMemoryHistory())
+
+    await router.push('/mail/1001')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).not.toBe('mail-detail')
+    expect(router.currentRoute.value.matched.map((record) => record.path)).not.toContain(
+      '/mail/:mailId',
+    )
   })
 })

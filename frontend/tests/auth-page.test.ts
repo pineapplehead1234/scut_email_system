@@ -8,6 +8,7 @@ import AuthPage from '../src/pages/auth/AuthPage.vue'
 import { createAppRouter } from '../src/router'
 
 const mocks = vi.hoisted(() => ({
+  getCurrentUser: vi.fn(),
   login: vi.fn(),
   register: vi.fn(),
 }))
@@ -17,7 +18,7 @@ vi.mock('../src/api/auth', () => ({
     login: mocks.login,
     register: mocks.register,
     logout: vi.fn(),
-    getCurrentUser: vi.fn(),
+    getCurrentUser: mocks.getCurrentUser,
   },
 }))
 
@@ -27,6 +28,7 @@ describe('AuthPage', () => {
     setActivePinia(createPinia())
     mocks.login.mockReset()
     mocks.register.mockReset()
+    mocks.getCurrentUser.mockReset()
   })
 
   it('submits credentials through auth store and navigates to redirect target', async () => {
@@ -37,6 +39,12 @@ describe('AuthPage', () => {
         nickname: '管理员',
         emailAddress: 'admin@mail.com',
       },
+    })
+    mocks.getCurrentUser.mockResolvedValue({
+      username: 'admin',
+      nickname: '管理员',
+      emailAddress: 'admin@mail.com',
+      avatarText: '管',
     })
 
     const router = createAppRouter(createMemoryHistory())

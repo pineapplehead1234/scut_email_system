@@ -10,8 +10,9 @@ import { setUnauthorizedHandler } from '../api/http'
 import AppLayout from '../layouts/AppLayout.vue'
 import AuthPage from '../pages/auth/AuthPage.vue'
 import ComposePage from '../pages/mail/ComposePage.vue'
-import MailDetailPage from '../pages/mail/MailDetailPage.vue'
 import MailListPage from '../pages/mail/MailListPage.vue'
+import ThreadDetailPage from '../pages/mail/ThreadDetailPage.vue'
+import ThreadListPage from '../pages/mail/ThreadListPage.vue'
 import ChangePasswordPage from '../pages/settings/ChangePasswordPage.vue'
 import SettingsPage from '../pages/settings/SettingsPage.vue'
 
@@ -37,10 +38,10 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'inbox',
         name: 'mail-inbox',
-        component: MailListPage,
+        component: ThreadListPage,
         meta: {
           title: '收件箱',
-          folder: 'inbox',
+          folder: 'INBOX',
         },
       },
       {
@@ -49,7 +50,7 @@ export const routes: RouteRecordRaw[] = [
         component: MailListPage,
         meta: {
           title: '已发送',
-          folder: 'sent',
+          folder: 'SENT',
         },
       },
       {
@@ -58,7 +59,7 @@ export const routes: RouteRecordRaw[] = [
         component: MailListPage,
         meta: {
           title: '已删除',
-          folder: 'trash',
+          folder: 'TRASH',
         },
       },
       {
@@ -66,8 +67,8 @@ export const routes: RouteRecordRaw[] = [
         name: 'mail-spam',
         component: MailListPage,
         meta: {
-          title: '垃圾邮箱',
-          folder: 'spam',
+          title: '垃圾邮件',
+          folder: 'SPAM',
         },
       },
       {
@@ -79,11 +80,11 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: ':mailId',
-        name: 'mail-detail',
-        component: MailDetailPage,
+        path: 'thread/:threadId',
+        name: 'mail-thread-detail',
+        component: ThreadDetailPage,
         meta: {
-          title: '邮件详情',
+          title: '邮件线程详情',
         },
       },
     ],

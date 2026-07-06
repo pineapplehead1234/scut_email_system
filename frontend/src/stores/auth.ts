@@ -47,11 +47,6 @@ function readStoredUser() {
   }
 }
 
-function persistSession(token: string, user: CurrentUser) {
-  localStorage.setItem(TOKEN_STORAGE_KEY, token)
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
-}
-
 function clearSession() {
   localStorage.removeItem(TOKEN_STORAGE_KEY)
   localStorage.removeItem(USER_STORAGE_KEY)
@@ -66,13 +61,23 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(credentials: LoginRequest) {
     const data = await authApi.login(credentials)
-    const currentUser = normalizeUser(data.user)
 
     token.value = data.token
-    user.value = currentUser
-    persistSession(data.token, currentUser)
+    localStorage.setItem(TOKEN_STORAGE_KEY, data.token)
 
-    return data
+    try {
+      await fetchCurrentUser()
+    } catch (error) {
+      token.value = null
+      user.value = emptyUser
+      clearSession()
+      throw error
+    }
+
+    return {
+      ...data,
+      user: user.value,
+    }
   }
 
   async function fetchCurrentUser() {

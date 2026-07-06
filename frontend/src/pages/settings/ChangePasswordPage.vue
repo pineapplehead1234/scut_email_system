@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { FormInstance, FormRules } from 'element-plus'
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+
+import userApi from '../../api/user'
 
 type PasswordForm = {
   currentPassword: string
@@ -9,7 +10,9 @@ type PasswordForm = {
   confirmPassword: string
 }
 
-const formRef = ref<FormInstance>()
+const saving = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
 
 const form = reactive<PasswordForm>({
   currentPassword: '',
@@ -17,38 +20,60 @@ const form = reactive<PasswordForm>({
   confirmPassword: '',
 })
 
-const rules: FormRules<PasswordForm> = {
-  currentPassword: [
-    { required: true, message: '请输入当前密码', trigger: 'blur' },
-  ],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, message: '新密码至少 8 位', trigger: 'blur' },
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
-    {
-      validator: (_rule, value, callback) => {
-        if (value !== form.newPassword) {
-          callback(new Error('两次输入的新密码不一致'))
-          return
-        }
+function validateForm() {
+  if (!form.currentPassword) {
+    return '请输入当前密码'
+  }
 
-        callback()
-      },
-      trigger: 'blur',
-    },
-  ],
+  if (!form.newPassword) {
+    return '请输入新密码'
+  }
+
+  if (form.newPassword.length < 8) {
+    return '新密码至少 8 位'
+  }
+
+  if (!form.confirmPassword) {
+    return '请再次输入新密码'
+  }
+
+  if (form.confirmPassword !== form.newPassword) {
+    return '两次输入的新密码不一致'
+  }
+
+  return ''
+}
+
+function resetForm() {
+  form.currentPassword = ''
+  form.newPassword = ''
+  form.confirmPassword = ''
 }
 
 async function submitPasswordChange() {
-  const valid = await formRef.value?.validate().catch(() => false)
+  errorMessage.value = ''
+  successMessage.value = ''
 
-  if (!valid) {
+  const validationError = validateForm()
+  if (validationError) {
+    errorMessage.value = validationError
     return
   }
 
-  ElMessage.info('修改密码接口待接入')
+  saving.value = true
+  try {
+    await userApi.changePassword({
+      currentPassword: form.currentPassword,
+      newPassword: form.newPassword,
+    })
+    resetForm()
+    successMessage.value = '密码已更新'
+    ElMessage.success(successMessage.value)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '密码修改失败'
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 
@@ -62,52 +87,71 @@ async function submitPasswordChange() {
         </p>
       </div>
 
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-position="top"
-        class="max-w-[520px]"
-      >
-        <el-form-item label="当前密码" prop="currentPassword">
-          <el-input
+      <form class="max-w-[520px]" @submit.prevent="submitPasswordChange">
+        <div
+          v-if="errorMessage"
+          class="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {{ errorMessage }}
+        </div>
+        <div
+          v-if="successMessage"
+          class="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+        >
+          {{ successMessage }}
+        </div>
+
+        <label class="block text-sm font-medium text-slate-700">
+          当前密码
+          <input
             v-model="form.currentPassword"
+            data-test="password-current"
             type="password"
-            show-password
             autocomplete="current-password"
+            class="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
             placeholder="请输入当前密码"
           />
-        </el-form-item>
+        </label>
 
-        <el-form-item label="新密码" prop="newPassword">
-          <el-input
+        <label class="mt-5 block text-sm font-medium text-slate-700">
+          新密码
+          <input
             v-model="form.newPassword"
+            data-test="password-new"
             type="password"
-            show-password
             autocomplete="new-password"
+            class="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
             placeholder="至少 8 位"
           />
-        </el-form-item>
+        </label>
 
-        <el-form-item label="确认新密码" prop="confirmPassword">
-          <el-input
+        <label class="mt-5 block text-sm font-medium text-slate-700">
+          确认新密码
+          <input
             v-model="form.confirmPassword"
+            data-test="password-confirm"
             type="password"
-            show-password
             autocomplete="new-password"
+            class="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
             placeholder="再次输入新密码"
           />
-        </el-form-item>
+        </label>
 
         <div class="mt-7 flex items-center gap-3">
-          <el-button type="primary" @click="submitPasswordChange">
+          <el-button
+            type="primary"
+            native-type="submit"
+            :loading="saving"
+            data-test="password-submit"
+            @click="submitPasswordChange"
+          >
             保存修改
           </el-button>
           <RouterLink to="/settings" class="text-sm text-slate-500 hover:text-[#185c68]">
             返回设置
           </RouterLink>
         </div>
-      </el-form>
+      </form>
     </section>
 
     <aside class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">

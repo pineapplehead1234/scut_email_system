@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { computed } from 'vue'
+import { computed, onMounted, provide, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Delete,
@@ -9,57 +9,94 @@ import {
   Lock,
   Message,
   Promotion,
-  Refresh,
-  Search,
   Setting,
   SwitchButton,
   User,
   WarningFilled,
 } from '@element-plus/icons-vue'
 
+import mailApi from '../api/mail'
+import type { MailStatisticsVO } from '../api/type'
+import { refreshMailStatisticsKey } from '../pages/mail/mail-statistics-context'
 import { useAuthStore } from '../stores/auth'
 
 type SidebarItem = {
   label: string
   to: string
   icon: Component
-  count?: number
+  count: number
+  countTestId: string
   tone?: 'normal' | 'danger'
+}
+
+const emptyStatistics: MailStatisticsVO = {
+  inboxTotal: 0,
+  inboxUnread: 0,
+  sentTotal: 0,
+  trashTotal: 0,
+  spamTotal: 0,
 }
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const statistics = ref<MailStatisticsVO>({ ...emptyStatistics })
 
 const pageTitle = computed(() => String(route.meta.title || '邮件系统'))
 
-const folderItems: SidebarItem[] = [
+const folderItems = computed<SidebarItem[]>(() => [
   {
     label: '收件箱',
     to: '/mail/inbox',
     icon: Message,
-    count: 12,
+    count: statistics.value.inboxUnread,
+    countTestId: 'folder-count-inbox',
   },
   {
     label: '已发送',
     to: '/mail/sent',
     icon: Promotion,
-    count: 8,
+    count: statistics.value.sentTotal,
+    countTestId: 'folder-count-sent',
   },
   {
     label: '已删除',
     to: '/mail/trash',
     icon: Delete,
-    count: 2,
+    count: statistics.value.trashTotal,
+    countTestId: 'folder-count-trash',
   },
   {
-    label: '垃圾邮箱',
+    label: '垃圾邮件',
     to: '/mail/spam',
     icon: WarningFilled,
-    count: 1,
+    count: statistics.value.spamTotal,
+    countTestId: 'folder-count-spam',
     tone: 'danger',
   },
-]
+])
+
+async function loadMailStatistics() {
+  statistics.value = await mailApi.statistics()
+}
+
+async function ensureCurrentUser() {
+  if (!authStore.token || authStore.user.username) {
+    return
+  }
+
+  try {
+    await authStore.fetchCurrentUser()
+  } catch {
+    authStore.clearLocalSession()
+    await router.push({
+      path: '/login',
+      query: {
+        redirect: route.fullPath,
+      },
+    })
+  }
+}
 
 function isActive(path: string) {
   return route.path === path
@@ -77,6 +114,12 @@ function logout() {
   authStore.logout()
   router.push('/login')
 }
+
+provide(refreshMailStatisticsKey, loadMailStatistics)
+onMounted(() => {
+  void ensureCurrentUser()
+  void loadMailStatistics()
+})
 </script>
 
 <template>
@@ -145,8 +188,8 @@ function logout() {
             </el-icon>
             <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
             <span
-              v-if="item.count !== undefined"
               class="min-w-6 rounded-full px-2 py-0.5 text-center text-xs"
+              :data-test="item.countTestId"
               :class="
                 item.tone === 'danger'
                   ? 'bg-rose-50 text-rose-600'
@@ -204,12 +247,9 @@ function logout() {
       >
         <div>
           <h1 class="text-lg font-semibold text-slate-950">{{ pageTitle }}</h1>
-          <p class="mt-0.5 text-xs text-slate-500">站内消息、附件与 AI 分析统一处理</p>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <el-button :icon="Search" circle />
-          <el-button :icon="Refresh" circle />
+          <p class="mt-0.5 text-xs text-slate-500">
+            站内消息、附件与 AI 分析统一处理
+          </p>
         </div>
       </header>
 
