@@ -252,7 +252,7 @@ async function submitRegister() {
               key="login-form"
               :model="loginForm"
               :rules="loginRules"
-              class="auth-form mt-7 space-y-4"
+              class="auth-form mt-8 space-y-5"
               label-position="top"
               @submit.prevent="submitLogin"
             >
@@ -292,7 +292,8 @@ async function submitRegister() {
               key="register-form"
               :model="registerForm"
               :rules="registerRules"
-              class="auth-form mt-7 space-y-4"
+              class="auth-form auth-register-form mt-8 space-y-6"
+              data-test="register-form"
               label-position="top"
               @submit.prevent="submitRegister"
             >
@@ -388,7 +389,7 @@ async function submitRegister() {
 }
 
 :deep(.auth-form .el-form-item__label) {
-  padding-bottom: 7px;
+  padding-bottom: 8px;
   color: #334155;
   font-size: 14px;
   font-weight: 500;

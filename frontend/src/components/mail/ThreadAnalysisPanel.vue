@@ -10,6 +10,7 @@ type DisplayItem = {
 
 const props = defineProps<{
   analysis?: ThreadAnalysisVO | null
+  aiEnabled?: boolean
   errorMessage?: string
   hasMore: boolean
   loadedMailCount: number
@@ -38,13 +39,23 @@ const statusClasses: Record<AnalysisStatus, string> = {
   DISABLED: 'bg-slate-100 text-slate-500',
 }
 
+const isAiDisabled = computed(() => props.aiEnabled === false)
+
 const statusText = computed(() => {
+  if (isAiDisabled.value) {
+    return 'AI 已关闭'
+  }
+
   const status = props.analysis?.analysisStatus
 
   return status ? statusLabels[status] : '未开始'
 })
 
 const statusClass = computed(() => {
+  if (isAiDisabled.value) {
+    return statusClasses.DISABLED
+  }
+
   const status = props.analysis?.analysisStatus
 
   return status ? statusClasses[status] : statusClasses.NOT_STARTED
@@ -112,6 +123,13 @@ function updateReanalyzeAll(event: Event) {
         </div>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
           {{ analysis?.summary || '暂无分析结果。' }}
+        </p>
+        <p
+          v-if="isAiDisabled"
+          data-test="ai-disabled-hint"
+          class="mt-2 text-xs font-medium text-slate-500"
+        >
+          AI 分析已关闭，当前展示基础规则分析结果。
         </p>
       </div>
 

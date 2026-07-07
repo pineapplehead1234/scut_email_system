@@ -236,9 +236,10 @@ onMounted(loadSettings)
             class="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
           >
             <option value="">未选择</option>
-            <option value="DEEPSEEK">DEEPSEEK</option>
-            <option value="OPENAI">OPENAI</option>
-            <option value="CUSTOM">CUSTOM</option>
+            <option value="qwen">QWEN</option>
+            <option value="deepseek">DEEPSEEK</option>
+            <option value="openai">OPENAI</option>
+            <option value="custom">CUSTOM</option>
           </select>
         </label>
 

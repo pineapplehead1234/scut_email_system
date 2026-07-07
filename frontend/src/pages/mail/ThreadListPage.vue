@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 
 import threadApi from '../../api/thread'
-import type { ThreadPageData, ThreadQueryParams } from '../../api/type'
+import type { ThreadListItemVO, ThreadPageData, ThreadQueryParams } from '../../api/type'
 import PaginationBar from '../../components/mail/PaginationBar.vue'
 import ThreadFilterToolbar from '../../components/mail/ThreadFilterToolbar.vue'
 import ThreadMessageList from '../../components/mail/ThreadMessageList.vue'
+import { refreshMailStatisticsKey } from './mail-statistics-context'
+import { createMailboxMutationService } from './mailbox-mutations'
 import { toThreadListQuery } from './thread-list-query'
 
 const route = useRoute()
 const router = useRouter()
+const refreshMailStatistics = inject(refreshMailStatisticsKey, undefined)
+const mailboxMutations = createMailboxMutationService({
+  refreshMailStatistics,
+})
 
 const emptyPage: ThreadPageData = {
   page: 1,
@@ -21,6 +27,7 @@ const emptyPage: ThreadPageData = {
 }
 
 const loading = ref(false)
+const operatingThreadId = ref<number | null>(null)
 const errorMessage = ref('')
 const pageData = ref<ThreadPageData>({ ...emptyPage })
 
@@ -86,6 +93,50 @@ function resetFilters() {
   })
 }
 
+function latestMailId(thread: ThreadListItemVO) {
+  const value = (thread.lastMail as { mailId?: unknown }).mailId
+
+  return typeof value === 'number' ? value : null
+}
+
+function resolveThreadActions(thread: ThreadListItemVO) {
+  return latestMailId(thread) == null ? [] : [{ type: 'delete' as const }]
+}
+
+async function runThreadOperation(
+  threadId: number,
+  operation: () => Promise<unknown>,
+) {
+  operatingThreadId.value = threadId
+  errorMessage.value = ''
+
+  try {
+    await operation()
+    await loadThreads()
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : '邮件操作失败'
+  } finally {
+    operatingThreadId.value = null
+  }
+}
+
+function deleteThread(threadId: number) {
+  const thread = pageData.value.records.find((item) => item.threadId === threadId)
+  const mailId = thread ? latestMailId(thread) : null
+
+  if (mailId == null) {
+    return
+  }
+
+  return runThreadOperation(threadId, () => mailboxMutations.deleteMail(mailId))
+}
+
+function handleThreadAction(action: { type: string }, threadId: number) {
+  if (action.type === 'delete') {
+    void deleteThread(threadId)
+  }
+}
 watch(() => route.fullPath, loadThreads, { immediate: true })
 </script>
 
@@ -109,8 +160,10 @@ watch(() => route.fullPath, loadThreads, { immediate: true })
       folder="INBOX"
       :threads="pageData.records"
       :loading="loading"
-      :resolve-actions="() => []"
+      :operating-thread-id="operatingThreadId"
+      :resolve-actions="resolveThreadActions"
       @view-thread="viewThread"
+      @thread-action="handleThreadAction"
     />
 
     <PaginationBar

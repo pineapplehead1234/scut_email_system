@@ -8,11 +8,18 @@ import type { ThreadPageData } from '../src/api/type'
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
+  deleteMail: vi.fn(),
 }))
 
 vi.mock('../src/api/thread', () => ({
   default: {
     list: mocks.list,
+  },
+}))
+
+vi.mock('../src/api/mail', () => ({
+  default: {
+    delete: mocks.deleteMail,
   },
 }))
 
@@ -27,6 +34,7 @@ const pageData: ThreadPageData = {
       subject: 'Lab report reminder',
       lastSnippet: 'Please submit this week.',
       lastMail: {
+        mailId: 1002,
         sender: {
           username: 'teacher',
           nickname: 'Teacher',
@@ -85,7 +93,13 @@ async function mountThreadList(initialPath: string) {
 describe('ThreadListPage', () => {
   beforeEach(() => {
     mocks.list.mockReset()
+    mocks.deleteMail.mockReset()
     mocks.list.mockResolvedValue(pageData)
+    mocks.deleteMail.mockResolvedValue({
+      mailId: 1002,
+      deleted: true,
+      deletedAt: '2026-05-26T10:00:00',
+    })
   })
 
   it('loads inbox threads through threadApi.list without a folder parameter', async () => {
@@ -173,12 +187,17 @@ describe('ThreadListPage', () => {
     expect(router.currentRoute.value.path).toBe('/mail/thread/2001')
   })
 
-  it('does not render thread-level state action buttons', async () => {
+  it('deletes the latest inbox mail from a thread row', async () => {
     const { wrapper } = await mountThreadList('/mail/inbox')
 
     expect(wrapper.find('[data-test="mark-read-thread"]').exists()).toBe(false)
-    expect(wrapper.find('[data-test="delete-thread"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="restore-thread"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="retry-analysis-thread"]').exists()).toBe(false)
+
+    await wrapper.get('[data-test="delete-thread"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.deleteMail).toHaveBeenCalledWith(1002)
+    expect(mocks.list).toHaveBeenCalledTimes(2)
   })
 })

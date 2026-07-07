@@ -21,7 +21,7 @@ const configuredSettings = {
   autoReplyEnabled: false,
   prioritySortEnabled: true,
   modelConfigured: true,
-  provider: 'DEEPSEEK' as const,
+  provider: 'deepseek' as const,
   baseUrl: 'https://api.deepseek.com',
   modelName: 'deepseek-chat',
   apiKeyConfigured: true,
@@ -71,7 +71,7 @@ describe('SettingsPage', () => {
       aiEnabled: true,
       autoReplyEnabled: true,
       prioritySortEnabled: true,
-      provider: 'DEEPSEEK',
+      provider: 'deepseek',
       baseUrl: 'https://api.deepseek.com',
       modelName: 'deepseek-chat',
       timeoutMs: 30000,
@@ -80,13 +80,27 @@ describe('SettingsPage', () => {
     })
   })
 
+  it('submits provider values accepted by the backend', async () => {
+    const wrapper = await mountSettingsPage()
+
+    await wrapper.get('[data-test="settings-provider"]').setValue('openai')
+    await wrapper.get('[data-test="settings-save"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+      }),
+    )
+  })
+
   it('blocks first model configuration when apiKey is missing', async () => {
     const wrapper = await mountSettingsPage({
       ...configuredSettings,
       modelConfigured: false,
       apiKeyConfigured: false,
       maskedApiKey: null,
-      provider: 'CUSTOM',
+      provider: 'custom',
       baseUrl: 'https://api.example.com',
       modelName: 'custom-model',
     })

@@ -42,7 +42,7 @@ export type ChangePasswordRequest = {
   newPassword: string
 }
 
-export type Provider = 'DEEPSEEK' | 'OPENAI' | 'CUSTOM'
+export type Provider = 'qwen' | 'openai' | 'deepseek' | 'kimi' | 'glm' | 'siliconflow' | 'custom'
 
 export type UserSettingsVO = {
   aiEnabled: boolean

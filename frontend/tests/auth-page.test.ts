@@ -70,6 +70,25 @@ describe('AuthPage', () => {
     expect(router.currentRoute.value.path).toBe('/settings')
   })
 
+
+  it('uses a roomier layout for the register form fields', async () => {
+    const router = createAppRouter(createMemoryHistory())
+    await router.push('/login')
+    await router.isReady()
+
+    const wrapper = mount(AuthPage, {
+      global: {
+        plugins: [ElementPlus, router],
+      },
+    })
+
+    await wrapper.get('[data-test="auth-mode-register"]').trigger('click')
+
+    const registerFormClasses = wrapper.get('[data-test="register-form"]').classes()
+    expect(registerFormClasses).toContain('auth-register-form')
+    expect(registerFormClasses).toContain('space-y-6')
+  })
+
   it('registers an account then returns to login with username filled', async () => {
     mocks.register.mockResolvedValue({
       username: 'lisi',

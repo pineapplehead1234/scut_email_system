@@ -26,6 +26,8 @@ type SidebarItem = {
   icon: Component
   count: number
   countTestId: string
+  unreadCount?: number
+  unreadTestId?: string
   tone?: 'normal' | 'danger'
 }
 
@@ -49,8 +51,10 @@ const folderItems = computed<SidebarItem[]>(() => [
     label: '收件箱',
     to: '/mail/inbox',
     icon: Message,
-    count: statistics.value.inboxUnread,
+    count: statistics.value.inboxTotal,
     countTestId: 'folder-count-inbox',
+    unreadCount: statistics.value.inboxUnread,
+    unreadTestId: 'folder-unread-inbox',
   },
   {
     label: '已发送',
@@ -110,9 +114,9 @@ function openPasswordSettings() {
   router.push('/settings/password')
 }
 
-function logout() {
-  authStore.logout()
-  router.push('/login')
+async function logout() {
+  await authStore.logout()
+  await router.replace('/login')
 }
 
 provide(refreshMailStatisticsKey, loadMailStatistics)
@@ -188,6 +192,13 @@ onMounted(() => {
             </el-icon>
             <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
             <span
+              v-if="item.unreadCount && item.unreadCount > 0"
+              class="min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-white"
+              :data-test="item.unreadTestId"
+            >
+              {{ item.unreadCount }}
+            </span>
+            <span
               class="min-w-6 rounded-full px-2 py-0.5 text-center text-xs"
               :data-test="item.countTestId"
               :class="
@@ -232,7 +243,7 @@ onMounted(() => {
               <el-dropdown-item :icon="Lock" @click="openPasswordSettings">
                 修改密码
               </el-dropdown-item>
-              <el-dropdown-item divided :icon="SwitchButton" @click="logout">
+              <el-dropdown-item divided :icon="SwitchButton" data-test="logout-button" @click="logout">
                 退出登录
               </el-dropdown-item>
             </el-dropdown-menu>

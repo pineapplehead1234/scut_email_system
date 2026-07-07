@@ -296,7 +296,7 @@ export function createHttpClient(instance: AxiosInstance): HttpClient {
 
 export const rawHttp = axios.create({
   baseURL: networkConfig.apiBaseURL,
-  timeout: 10000,
+  timeout: 30000,
 })
 
 const http = createHttpClient(rawHttp)

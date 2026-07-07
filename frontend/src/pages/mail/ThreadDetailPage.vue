@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import threadApi from '../../api/thread'
+import userApi from '../../api/user'
 import type {
   MailAttachmentVO,
   MailItemVO,
@@ -44,6 +45,8 @@ const aiLoading = ref(false)
 const aiErrorMessage = ref('')
 const analysisLoading = ref(false)
 const analysisErrorMessage = ref('')
+const aiAnalysisEnabled = ref(true)
+const aiReplyEnabled = ref(true)
 const reanalyzeAllLoadedMails = ref(false)
 
 const latestReplyTarget = computed(() => {
@@ -120,7 +123,37 @@ function syncFullReplyContext() {
   fullReplySubject.value = buildReplySubject(thread.value?.subject || '')
 }
 
-async function loadDetail() {
+async function loadAiSettings() {
+  try {
+    const settings = await userApi.getSettings()
+    aiAnalysisEnabled.value = settings.aiEnabled
+    aiReplyEnabled.value = settings.autoReplyEnabled
+  } catch {
+    aiAnalysisEnabled.value = true
+    aiReplyEnabled.value = true
+  }
+}
+
+function blockAiAnalysisIfDisabled() {
+  if (aiAnalysisEnabled.value) {
+    return false
+  }
+
+  analysisErrorMessage.value = 'AI 分析功能已关闭，请在设置中开启后再重新分析。'
+  return true
+}
+
+function blockAiReplyIfDisabled() {
+  if (aiReplyEnabled.value) {
+    return false
+  }
+
+  aiSuggestion.value = null
+  aiErrorMessage.value = 'AI 回复功能已关闭，请在设置中开启后使用。'
+  return true
+}
+
+async function loadDetail(refreshStatistics: boolean | Event = true) {
   if (!threadId.value) {
     return
   }
@@ -130,6 +163,9 @@ async function loadDetail() {
 
   try {
     thread.value = await threadApi.detail(threadId.value)
+    if (refreshStatistics !== false) {
+      await refreshMailStatistics?.()
+    }
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : '线程详情加载失败'
@@ -212,7 +248,7 @@ async function submitQuickReply() {
     )
     quickReplyText.value = ''
     aiSuggestion.value = null
-    await loadDetail()
+    await loadDetail(false)
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : '回复发送失败'
@@ -241,7 +277,7 @@ async function submitFullReply(payload: MailComposerSubmitPayload) {
     clearFullReplyDraft()
     quickReplyText.value = ''
     aiSuggestion.value = null
-    await loadDetail()
+    await loadDetail(false)
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : '回复发送失败'
@@ -251,6 +287,10 @@ async function submitFullReply(payload: MailComposerSubmitPayload) {
 }
 
 async function generateAiSuggestion() {
+  if (blockAiReplyIfDisabled()) {
+    return
+  }
+
   if (!threadId.value) {
     return
   }
@@ -278,6 +318,10 @@ async function generateAiSuggestion() {
 }
 
 async function runThreadAnalysis() {
+  if (blockAiAnalysisIfDisabled()) {
+    return
+  }
+
   const currentThread = thread.value
   const target = latestReplyTarget.value
 
@@ -298,7 +342,7 @@ async function runThreadAnalysis() {
       await mailboxMutations.retryMailAnalysis(target.mailId)
     }
 
-    await loadDetail()
+    await loadDetail(false)
     await generateAiSuggestion()
   } catch (error) {
     analysisErrorMessage.value =
@@ -326,14 +370,20 @@ function adoptAiSuggestion() {
 async function retryAnalysis(mail: MailItemVO) {
   errorMessage.value = ''
 
+  if (blockAiAnalysisIfDisabled()) {
+    return
+  }
+
   try {
     await mailboxMutations.retryMailAnalysis(mail.mailId)
-    await loadDetail()
+    await loadDetail(false)
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : '重新分析失败'
   }
 }
+
+onMounted(loadAiSettings)
 
 watch(
   threadId,
@@ -379,6 +429,7 @@ watch(
         <ThreadAnalysisPanel
           v-model:reanalyze-all="reanalyzeAllLoadedMails"
           :analysis="thread.analysis"
+          :ai-enabled="aiAnalysisEnabled"
           :error-message="analysisErrorMessage"
           :has-more="thread.hasMore"
           :loaded-mail-count="thread.mails.length"

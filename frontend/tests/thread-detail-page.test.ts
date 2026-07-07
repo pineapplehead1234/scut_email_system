@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   reply: vi.fn(),
   retryAnalysis: vi.fn(),
   upload: vi.fn(),
+  getSettings: vi.fn(),
 }))
 
 vi.mock('../src/api/thread', () => ({
@@ -40,6 +41,12 @@ vi.mock('../src/api/file', () => ({
 vi.mock('../src/api/mail', () => ({
   default: {
     retryAnalysis: mocks.retryAnalysis,
+  },
+}))
+
+vi.mock('../src/api/user', () => ({
+  default: {
+    getSettings: mocks.getSettings,
   },
 }))
 
@@ -172,7 +179,22 @@ describe('ThreadDetailPage', () => {
     mocks.reply.mockReset()
     mocks.retryAnalysis.mockReset()
     mocks.upload.mockReset()
+    mocks.getSettings.mockReset()
     mocks.detail.mockResolvedValue(threadDetail)
+    mocks.getSettings.mockResolvedValue({
+      aiEnabled: true,
+      autoReplyEnabled: true,
+      prioritySortEnabled: true,
+      modelConfigured: false,
+      provider: null,
+      modelName: null,
+      baseUrl: null,
+      apiKeyConfigured: false,
+      maskedApiKey: null,
+      timeoutMs: 10000,
+      maxTokens: 800,
+      temperature: 0.2,
+    })
     mocks.generateReplySuggestion.mockResolvedValue({
       content: [
         {
@@ -202,6 +224,11 @@ describe('ThreadDetailPage', () => {
     expect(wrapper.text()).toContain('Please submit this week.')
   })
 
+  it('refreshes mailbox statistics after opening thread detail', async () => {
+    const { refreshMailStatistics } = await mountThreadDetail()
+
+    expect(refreshMailStatistics).toHaveBeenCalledOnce()
+  })
   it('renders thread-level AI analysis from thread detail data', async () => {
     const { wrapper } = await mountThreadDetail()
 
@@ -279,7 +306,7 @@ describe('ThreadDetailPage', () => {
       ],
     })
     expect(mocks.detail).toHaveBeenCalledTimes(2)
-    expect(refreshMailStatistics).toHaveBeenCalledOnce()
+    expect(refreshMailStatistics).toHaveBeenCalledTimes(2)
   })
 
   it('opens a bottom reply drawer and sends a full reply with an attachment', async () => {
@@ -340,6 +367,55 @@ describe('ThreadDetailPage', () => {
     ).toBe('收到，我会尽快查看实验报告。')
   })
 
+  it('blocks manual AI analysis when the current user has disabled mail analysis', async () => {
+    mocks.getSettings.mockResolvedValueOnce({
+      aiEnabled: false,
+      autoReplyEnabled: true,
+      prioritySortEnabled: true,
+      modelConfigured: false,
+      provider: null,
+      modelName: null,
+      baseUrl: null,
+      apiKeyConfigured: false,
+      maskedApiKey: null,
+      timeoutMs: 10000,
+      maxTokens: 800,
+      temperature: 0.2,
+    })
+    const { wrapper } = await mountThreadDetail()
+
+    await wrapper.get('[data-test="thread-ai-analysis-run"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.retryAnalysis).not.toHaveBeenCalled()
+    expect(mocks.replyText).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('AI 分析功能已关闭，请在设置中开启后再重新分析。')
+  })
+
+  it('blocks AI reply suggestions when the current user has disabled auto reply', async () => {
+    mocks.getSettings.mockResolvedValueOnce({
+      aiEnabled: true,
+      autoReplyEnabled: false,
+      prioritySortEnabled: true,
+      modelConfigured: false,
+      provider: null,
+      modelName: null,
+      baseUrl: null,
+      apiKeyConfigured: false,
+      maskedApiKey: null,
+      timeoutMs: 10000,
+      maxTokens: 800,
+      temperature: 0.2,
+    })
+    const { wrapper } = await mountThreadDetail()
+
+    await wrapper.get('[data-test="ai-reply-suggest"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.replyText).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('AI 回复功能已关闭，请在设置中开启后使用。')
+  })
+
   it('reanalyzes the latest loaded mail, refreshes detail, then loads reply text', async () => {
     const { refreshMailStatistics, wrapper } = await mountThreadDetail()
 
@@ -347,7 +423,7 @@ describe('ThreadDetailPage', () => {
     await flushPromises()
 
     expect(mocks.retryAnalysis).toHaveBeenCalledWith(1002)
-    expect(refreshMailStatistics).toHaveBeenCalledOnce()
+    expect(refreshMailStatistics).toHaveBeenCalledTimes(2)
     expect(mocks.detail).toHaveBeenCalledTimes(2)
     expect(mocks.replyText).toHaveBeenCalledWith('2001')
     expect(wrapper.get('[data-test="ai-suggestion-card"]').text()).toContain(
@@ -365,7 +441,7 @@ describe('ThreadDetailPage', () => {
     expect(mocks.retryAnalysis).toHaveBeenCalledTimes(2)
     expect(mocks.retryAnalysis).toHaveBeenNthCalledWith(1, 1001)
     expect(mocks.retryAnalysis).toHaveBeenNthCalledWith(2, 1002)
-    expect(refreshMailStatistics).toHaveBeenCalledOnce()
+    expect(refreshMailStatistics).toHaveBeenCalledTimes(2)
     expect(mocks.detail).toHaveBeenCalledTimes(2)
   })
 
@@ -377,6 +453,6 @@ describe('ThreadDetailPage', () => {
 
     expect(mocks.retryAnalysis).toHaveBeenCalledWith(1001)
     expect(mocks.detail).toHaveBeenCalledTimes(2)
-    expect(refreshMailStatistics).toHaveBeenCalledOnce()
+    expect(refreshMailStatistics).toHaveBeenCalledTimes(2)
   })
 })
